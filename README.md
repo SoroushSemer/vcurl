@@ -21,7 +21,7 @@ With `vcurl`, the LLM is completely blind to the actual secrets.
 ```json
 {
   "method": "POST",
-  "url": "[https://api.github.com/repos/example/repo/issues](https://api.github.com/repos/example/repo/issues)",
+  "url": "https://api.github.com/repos/example/repo/issues",
   "credential_alias": "github_write_token",
   "body": { "title": "New Issue" }
 }
