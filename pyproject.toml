@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vcurl"
+version = "0.1.0"
+description = "Zero-Knowledge Fetch for AI Agents preventing credential exfiltration via prompt injection"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [
+    { name = "vcurl Team" }
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Security :: Cryptography",
+]
+
+[project.scripts]
+vcurl = "vcurl.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["vcurl*"]
