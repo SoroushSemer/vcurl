@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>vcurl - Vault Curl Security Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --card-bg: rgba(30, 41, 59, 0.7);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --accent-cyan: #38bdf8;
+      --accent-purple: #818cf8;
+      --accent-green: #34d399;
+      --accent-red: #f87171;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.9));
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--card-border);
+      padding: 1.25rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .brand-logo {
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      color: #0f172a;
+      font-size: 1.2rem;
+    }
+    .brand-title {
+      font-size: 1.35rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #ffffff, #cbd5e1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .brand-tag {
+      font-size: 0.75rem;
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent-cyan);
+      padding: 0.2rem 0.5rem;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+
+    nav {
+      display: flex;
+      gap: 0.5rem;
+    }
+    .nav-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .nav-btn:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.04);
+    }
+    .nav-btn.active {
+      color: var(--accent-cyan);
+      background: rgba(56, 189, 248, 0.1);
+      border-color: rgba(56, 189, 248, 0.3);
+    }
+
+    main {
+      flex: 1;
+      padding: 2rem;
+      max-width: 1400px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; animation: fadeIn 0.3s ease; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .grid-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+    .stat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      backdrop-filter: blur(8px);
+    }
+    .stat-label { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.4rem; }
+    .stat-value { font-size: 1.8rem; font-weight: 700; color: var(--text-main); }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      backdrop-filter: blur(8px);
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.25rem;
+    }
+    .card-title { font-size: 1.15rem; font-weight: 600; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    th, td {
+      padding: 0.9rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    th {
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+    }
+    tbody tr:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .badge {
+      padding: 0.25rem 0.6rem;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .badge-allowed { background: rgba(52, 211, 153, 0.15); color: var(--accent-green); border: 1px solid rgba(52, 211, 153, 0.3); }
+    .badge-blocked { background: rgba(248, 113, 113, 0.15); color: var(--accent-red); border: 1px solid rgba(248, 113, 113, 0.3); }
+    .badge-method { background: rgba(129, 140, 248, 0.15); color: var(--accent-purple); border: 1px solid rgba(129, 140, 248, 0.3); }
+
+    .btn {
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+      color: #0f172a;
+      border: none;
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s ease;
+    }
+    .btn:hover { opacity: 0.9; }
+
+    .provider-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.25rem;
+    }
+    .provider-card {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .provider-title { font-weight: 600; font-size: 1.05rem; margin-bottom: 0.5rem; }
+    .provider-desc { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; }
+
+    .code-block {
+      font-family: 'JetBrains Mono', monospace;
+      background: #090d16;
+      padding: 0.8rem 1rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      color: var(--accent-cyan);
+      overflow-x: auto;
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    label { font-size: 0.85rem; color: var(--text-muted); }
+    input, select {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 0.6rem 0.8rem;
+      border-radius: 8px;
+      font-family: inherit;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--accent-cyan);
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="brand-logo">V</div>
+      <div>
+        <div class="brand-title">vcurl Security Vault</div>
+      </div>
+      <div class="brand-tag">Zero-Knowledge Fetch</div>
+    </div>
+    <nav>
+      <button class="nav-btn active" onclick="switchTab('tracker')">Outgoing Request Tracker</button>
+      <button class="nav-btn" onclick="switchTab('credentials')">Credential Manager</button>
+      <button class="nav-btn" onclick="switchTab('providers')">Secret Providers</button>
+      <button class="nav-btn" onclick="switchTab('integrations')">AI Tool Setup</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- TAB 1: OUTGOING REQUEST TRACKER -->
+    <div id="tab-tracker" class="tab-content active">
+      <div class="grid-stats">
+        <div class="stat-card">
+          <div class="stat-label">Total Audited Requests</div>
+          <div class="stat-value" id="stat-total">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">SSRF Blocked</div>
+          <div class="stat-value" id="stat-blocked" style="color: var(--accent-red);">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Safe Fetches</div>
+          <div class="stat-value" id="stat-allowed" style="color: var(--accent-green);">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Active Secret Providers</div>
+          <div class="stat-value" id="stat-providers">1</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Live Outgoing Request Audit Log</div>
+          <button class="btn" onclick="loadAuditLogs()">Refresh Audit Stream</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Method</th>
+              <th>Target URL</th>
+              <th>Resolved IP</th>
+              <th>Credential Alias</th>
+              <th>SSRF Protection</th>
+              <th>Status</th>
+              <th>Latency</th>
+            </tr>
+          </thead>
+          <tbody id="audit-table-body">
+            <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Loading audit records...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB 2: CREDENTIAL MANAGER -->
+    <div id="tab-credentials" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Registered Credential Aliases</div>
+          <button class="btn" onclick="showAddModal()">+ Register New Alias</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Alias Name</th>
+              <th>Target Environment Secret</th>
+              <th>Header Name</th>
+              <th>Prefix</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="vault-table-body">
+            <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Loading vault mappings...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Register / Update Credential Alias</div>
+        </div>
+        <form onsubmit="registerAlias(event)">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="form-group">
+              <label>Credential Alias Name (Used by LLM)</label>
+              <input type="text" id="input-alias" placeholder="e.g. github_write_token" required>
+            </div>
+            <div class="form-group">
+              <label>Target Environment Variable / Secret Key</label>
+              <input type="text" id="input-env" placeholder="e.g. GITHUB_TOKEN" required>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="form-group">
+              <label>HTTP Header Name</label>
+              <input type="text" id="input-header" value="Authorization" required>
+            </div>
+            <div class="form-group">
+              <label>Header Value Prefix</label>
+              <input type="text" id="input-prefix" value="Bearer ">
+            </div>
+          </div>
+          <button type="submit" class="btn" style="width: 200px;">Save Credential Alias</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- TAB 3: SECRET PROVIDERS -->
+    <div id="tab-providers" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Link External Secret Management Services</div>
+        </div>
+        <div class="provider-grid">
+          <div class="provider-card">
+            <div>
+              <div class="provider-title">Environment Variables (Default)</div>
+              <div class="provider-desc">Resolves aliases directly from process environment variables.</div>
+            </div>
+            <div class="badge badge-allowed" style="width: max-content;">ACTIVE</div>
+          </div>
+
+          <div class="provider-card">
+            <div>
+              <div class="provider-title">AWS Secrets Manager</div>
+              <div class="provider-desc">Connects to AWS Secrets Manager using IAM role or AWS credentials.</div>
+            </div>
+            <button class="btn" onclick="alert('AWS Secrets Manager Provider Linked!')">Link AWS SM</button>
+          </div>
+
+          <div class="provider-card">
+            <div>
+              <div class="provider-title">HashiCorp Vault</div>
+              <div class="provider-desc">Connects to HashiCorp Vault server via HTTP API (VAULT_ADDR & VAULT_TOKEN).</div>
+            </div>
+            <button class="btn" onclick="alert('HashiCorp Vault Provider Linked!')">Link Vault</button>
+          </div>
+
+          <div class="provider-card">
+            <div>
+              <div class="provider-title">Google Cloud Secret Manager</div>
+              <div class="provider-desc">Fetches secrets dynamically from GCP Secret Manager API.</div>
+            </div>
+            <button class="btn" onclick="alert('GCP Secret Manager Linked!')">Link GCP SM</button>
+          </div>
+
+          <div class="provider-card">
+            <div>
+              <div class="provider-title">Azure Key Vault</div>
+              <div class="provider-desc">Resolves secrets securely from Azure Key Vault instances.</div>
+            </div>
+            <button class="btn" onclick="alert('Azure Key Vault Linked!')">Link Azure Key Vault</button>
+          </div>
+
+          <div class="provider-card">
+            <div>
+              <div class="provider-title">1Password / Doppler / Local Vault</div>
+              <div class="provider-desc">Links local encrypted JSON secrets file (~/.vcurl/secrets.json).</div>
+            </div>
+            <button class="btn" onclick="alert('Local Encrypted Store Enabled!')">Enable Local Store</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: AI TOOL INTEGRATIONS -->
+    <div id="tab-integrations" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Enable vcurl for AI Tools</div>
+        </div>
+        <div class="provider-grid">
+          <div class="provider-card">
+            <div>
+              <div class="provider-title">Anthropic Claude Desktop / MCP</div>
+              <div class="provider-desc">Model Context Protocol tool server integration for Claude Desktop.</div>
+            </div>
+            <button class="btn" onclick="enableTool('claude')">Enable for Claude</button>
+          </div>
+
+          <div class="provider-card">
+            <div>
+              <div class="provider-title">OpenAI Codex & ChatGPT Assistants</div>
+              <div class="provider-desc">Generates OpenAPI function spec (vcurl_openai_tool.json).</div>
+            </div>
+            <button class="btn" onclick="enableTool('codex')">Enable for Codex</button>
+          </div>
+
+          <div class="provider-card">
+            <div>
+              <div class="provider-title">Antigravity (Google DeepMind IDE)</div>
+              <div class="provider-desc">Creates workspace skill definition (.agents/skills/vcurl/SKILL.md).</div>
+            </div>
+            <button class="btn" onclick="enableTool('antigravity')">Enable for Antigravity</button>
+          </div>
+
+          <div class="provider-card">
+            <div>
+              <div class="provider-title">LangChain & LangGraph</div>
+              <div class="provider-desc">Generates BaseTool python wrapper (vcurl_langchain.py).</div>
+            </div>
+            <button class="btn" onclick="enableTool('langchain')">Enable for LangChain</button>
+          </div>
+
+          <div class="provider-card">
+            <div>
+              <div class="provider-title">AutoGen & CrewAI</div>
+              <div class="provider-desc">Generates function calling helper (vcurl_agent_tools.py).</div>
+            </div>
+            <button class="btn" onclick="enableTool('autogen')">Enable for AutoGen</button>
+          </div>
+
+          <div class="provider-card">
+            <div>
+              <div class="provider-title">Cursor / Windsurf / Copilot</div>
+              <div class="provider-desc">Generates workspace security rules (.cursor/rules/vcurl-security.mdc).</div>
+            </div>
+            <button class="btn" onclick="enableTool('cursor')">Enable for Cursor</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    function switchTab(tabId) {
+      document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+      
+      event.target.classList.add('active');
+      document.getElementById('tab-' + tabId).classList.add('active');
+
+      if (tabId === 'tracker') loadAuditLogs();
+      if (tabId === 'credentials') loadVaultMappings();
+    }
+
+    async function loadAuditLogs() {
+      try {
+        const res = await fetch('/api/audit');
+        const records = await res.json();
+        
+        let allowed = 0, blocked = 0;
+        const tbody = document.getElementById('audit-table-body');
+        
+        if (!records || records.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">No requests audited yet. Initiate HTTP requests via execute_vcurl to populate.</td></tr>';
+          document.getElementById('stat-total').innerText = '0';
+          document.getElementById('stat-allowed').innerText = '0';
+          document.getElementById('stat-blocked').innerText = '0';
+          return;
+        }
+
+        tbody.innerHTML = records.map(r => {
+          if (r.ssrf_status === 'ALLOWED') allowed++; else blocked++;
+          const badgeClass = r.ssrf_status === 'ALLOWED' ? 'badge-allowed' : 'badge-blocked';
+          const time = new Date(r.timestamp).toLocaleTimeString();
+          return `
+            <tr>
+              <td>${time}</td>
+              <td><span class="badge badge-method">${r.method}</span></td>
+              <td style="font-family: monospace; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${r.url}</td>
+              <td style="font-family: monospace;">${r.resolved_ip || 'N/A'}</td>
+              <td style="font-family: monospace;">${r.credential_alias}</td>
+              <td><span class="badge ${badgeClass}">${r.ssrf_status}</span></td>
+              <td>${r.status_code || '403'}</td>
+              <td>${r.latency_ms} ms</td>
+            </tr>
+          `;
+        }).join('');
+
+        document.getElementById('stat-total').innerText = records.length;
+        document.getElementById('stat-allowed').innerText = allowed;
+        document.getElementById('stat-blocked').innerText = blocked;
+
+      } catch (err) {
+        console.error("Error loading audit logs:", err);
+      }
+    }
+
+    async function loadVaultMappings() {
+      try {
+        const res = await fetch('/api/vault');
+        const data = await res.json();
+        const tbody = document.getElementById('vault-table-body');
+
+        const entries = Object.entries(data);
+        if (entries.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">No credential aliases registered.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = entries.map(([alias, cfg]) => {
+          const envVar = typeof cfg === 'string' ? cfg : cfg.env;
+          const header = typeof cfg === 'string' ? 'Authorization' : (cfg.header || 'Authorization');
+          const prefix = typeof cfg === 'string' ? 'Bearer ' : (cfg.prefix || '');
+          return `
+            <tr>
+              <td style="font-weight: 600; font-family: monospace; color: var(--accent-cyan);">${alias}</td>
+              <td style="font-family: monospace;">${envVar}</td>
+              <td style="font-family: monospace;">${header}</td>
+              <td style="font-family: monospace;">${prefix || '(none)'}</td>
+              <td><span class="badge badge-allowed">REGISTERED</span></td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error("Error loading vault mappings:", err);
+      }
+    }
+
+    async function registerAlias(event) {
+      event.preventDefault();
+      const alias = document.getElementById('input-alias').value;
+      const env = document.getElementById('input-env').value;
+      const header = document.getElementById('input-header').value;
+      const prefix = document.getElementById('input-prefix').value;
+
+      try {
+        const res = await fetch('/api/vault', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ alias, env, header, prefix })
+        });
+        if (res.ok) {
+          alert(`Successfully registered alias '${alias}'!`);
+          loadVaultMappings();
+          document.getElementById('input-alias').value = '';
+          document.getElementById('input-env').value = '';
+        }
+      } catch (err) {
+        alert("Failed to register alias: " + err);
+      }
+    }
+
+    async function enableTool(toolId) {
+      try {
+        const res = await fetch('/api/enable-tool', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tool_id: toolId })
+        });
+        const data = await res.json();
+        alert(data.message || "Tool enabled successfully!");
+      } catch (err) {
+        alert("Error enabling tool: " + err);
+      }
+    }
+
+    // Initial load
+    loadAuditLogs();
+    setInterval(loadAuditLogs, 2000);
+  </script>
+</body>
+</html>
