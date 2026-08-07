@@ -1,6 +1,7 @@
 """
 vcurl Command Line Interface (CLI)
-Enables command-line execution or stdin JSON invocation of vcurl by AI Agents.
+Provides single-command setup (`vcurl setup`), Web Dashboard (`vcurl ui`),
+and direct request execution for AI Agents.
 """
 
 import argparse
@@ -9,13 +10,32 @@ import sys
 from typing import Any, Dict
 
 from .core import execute_vcurl
+from .integrations.wizard import run_interactive_wizard
+from .ui.server import start_ui_server
 
 
 def main() -> None:
+    # Check for direct subcommands (setup, ui)
+    if len(sys.argv) > 1:
+        cmd = sys.argv[1].lower()
+        if cmd in ("setup", "init"):
+            run_interactive_wizard()
+            return
+        elif cmd in ("ui", "dashboard"):
+            port = 8888
+            if "--port" in sys.argv:
+                try:
+                    idx = sys.argv.index("--port")
+                    port = int(sys.argv[idx + 1])
+                except (ValueError, IndexError):
+                    pass
+            start_ui_server(port=port)
+            return
+
     parser = argparse.ArgumentParser(
-        description="vcurl: Secure Zero-Knowledge HTTP Fetch for AI Agents"
+        description="vcurl: Zero-Knowledge Secure HTTP Fetch for AI Agents"
     )
-    parser.add_argument("--url", help="Target URL")
+    parser.add_argument("--url", help="Target HTTP/HTTPS URL")
     parser.add_argument("--method", default="GET", help="HTTP Method (default: GET)")
     parser.add_argument("--alias", help="Credential alias to resolve from vault")
     parser.add_argument("--body", help="JSON string body or plain text body")
@@ -26,7 +46,6 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.json or not args.url:
-        # Read from stdin if stdin is piped or --json flag used
         try:
             stdin_data = sys.stdin.read().strip()
             if stdin_data:
@@ -47,17 +66,15 @@ def main() -> None:
     else:
         url, method, alias, body, headers, timeout = args.url, args.method, args.alias, args.body, args.headers, args.timeout
 
-    # Parse headers if passed as JSON string
     parsed_headers = None
     if isinstance(headers, str):
         try:
             parsed_headers = json.loads(headers)
         except Exception:
-            sys.stderr.write("Warning: Headers parameter could not be parsed as JSON string.\n")
+            pass
     elif isinstance(headers, dict):
         parsed_headers = headers
 
-    # Parse body if passed as JSON string
     parsed_body = body
     if isinstance(body, str):
         try:

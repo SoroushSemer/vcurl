@@ -1,11 +1,15 @@
 """
 vcurl Vault Module
-Provides credential alias configuration, environment secret resolution,
-and secure header injection without exposing secrets to LLM callers.
+Provides credential alias configuration, pluggable secret provider resolution
+(Env, AWS, Vault, GCP, Azure, Encrypted Store), and secure header injection.
 """
 
 import os
-from typing import Dict, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
+
+from .providers.base import BaseSecretProvider
+from .providers.cloud_providers import EncryptedFileProvider
+from .providers.env_provider import EnvSecretProvider
 
 
 class VaultError(PermissionError):
@@ -16,24 +20,25 @@ class VaultError(PermissionError):
 class VaultConfig:
     """
     Manages mappings between safe credential aliases (used by LLMs)
-    and actual environment variables or secrets.
+    and actual environment variables or external secret management providers.
     """
-    def __init__(self, mapping: Optional[Dict[str, Union[str, Dict[str, str]]]] = None):
-        """
-        Initialize VaultConfig with a mapping.
-        
-        Examples of mapping entries:
-            "github_write_token": "GITHUB_TOKEN"
-            "slack_bot": "SLACK_BOT_TOKEN"
-            "custom_api": {
-                "env": "MY_CUSTOM_API_KEY",
-                "header": "X-API-Key",
-                "prefix": ""
-            }
-        """
+    def __init__(
+        self,
+        mapping: Optional[Dict[str, Union[str, Dict[str, str]]]] = None,
+        providers: Optional[List[BaseSecretProvider]] = None,
+    ):
         self._mapping: Dict[str, Union[str, Dict[str, str]]] = {}
         if mapping:
             self._mapping.update(mapping)
+
+        self.providers: List[BaseSecretProvider] = providers if providers is not None else [
+            EnvSecretProvider(),
+            EncryptedFileProvider(),
+        ]
+
+    def add_provider(self, provider: BaseSecretProvider) -> None:
+        """Registers an external secret provider (e.g. AWS, HashiCorp Vault, GCP, Azure)."""
+        self.providers.insert(0, provider)  # Higher priority
 
     def register_alias(
         self,
@@ -59,18 +64,17 @@ class VaultConfig:
 
     def resolve(self, alias: str) -> Tuple[str, str]:
         """
-        Resolves an alias to a header name and secret header value.
+        Resolves an alias to a header name and secret header value by querying configured providers.
         
         Returns:
             Tuple[header_name, header_value]
         
         Raises:
-            VaultError: If alias is not registered or secret environment variable is missing.
+            VaultError: If alias is not registered or secret cannot be resolved from any provider.
         """
         config = self.get_mapping(alias)
 
         if isinstance(config, str):
-            # Default convention: maps alias to env variable name, uses Authorization: Bearer <token>
             env_var = config
             header_name = "Authorization"
             header_prefix = "Bearer "
@@ -82,19 +86,26 @@ class VaultConfig:
             raise VaultError(f"Invalid vault configuration for alias '{alias}'.")
 
         if not env_var:
-            raise VaultError(f"Configuration for alias '{alias}' is missing target environment variable name.")
+            raise VaultError(f"Configuration for alias '{alias}' is missing target secret key name.")
 
-        secret = os.environ.get(env_var)
+        # Query chained secret providers in order
+        secret: Optional[str] = None
+        for provider in self.providers:
+            val = provider.get_secret(env_var)
+            if val:
+                secret = val
+                break
+
         if not secret:
             raise VaultError(
-                f"Secret resolution failed: Environment variable '{env_var}' for alias '{alias}' is not set or empty."
+                f"Secret resolution failed: Secret key '{env_var}' for alias '{alias}' was not found in any active provider (Env, AWS, Vault, GCP, Azure, Encrypted Store)."
             )
 
         header_value = f"{header_prefix}{secret}" if header_prefix else secret
         return header_name, header_value
 
 
-# Global default vault instance initialized from environment variable conventions
+# Global default vault instance initialized from standard conventions
 DEFAULT_VAULT = VaultConfig({
     "github_write_token": "GITHUB_TOKEN",
     "github_token": "GITHUB_TOKEN",
