@@ -77,7 +77,6 @@ class TestSSRFProtection(unittest.TestCase):
     @patch("socket.getaddrinfo")
     def test_validate_url_private_dns_resolution(self, mock_getaddrinfo):
         """Ensure domain resolving to private IP is blocked."""
-        # Mock domain resolving to local loopback 127.0.0.1
         mock_getaddrinfo.return_value = [
             (2, 1, 6, "", ("127.0.0.1", 80))
         ]
@@ -119,7 +118,7 @@ class TestVaultConfig(unittest.TestCase):
 
         with self.assertRaises(VaultError) as ctx:
             self.vault.resolve("test_alias")
-        self.assertIn("is not set or empty", str(ctx.exception))
+        self.assertIn("was not found in any active provider", str(ctx.exception))
 
     def test_valid_alias_resolution(self):
         """Ensure valid alias resolves to header name and bearer token value."""
@@ -174,7 +173,6 @@ class TestExecutionLayer(unittest.TestCase):
         """Test full successful execute_vcurl call with alias resolution and mock connection."""
         mock_validate_url.return_value = ("https", "api.github.com", 443, ["140.82.121.4"])
 
-        # Mock HTTP response
         mock_conn = MagicMock()
         mock_response = MagicMock()
         mock_response.status = 201
@@ -186,7 +184,6 @@ class TestExecutionLayer(unittest.TestCase):
         mock_conn.getresponse.return_value = mock_response
         mock_pinned_https.return_value = mock_conn
 
-        # Set environment variable for test
         os.environ["GITHUB_TOKEN"] = "ghp_mock_token_999"
 
         try:
@@ -197,12 +194,10 @@ class TestExecutionLayer(unittest.TestCase):
                 body={"title": "New Bug Report"},
             )
 
-            # Check return structure
             self.assertEqual(result["status_code"], 201)
             self.assertEqual(result["response_body"], {"id": 42, "message": "Issue Created"})
             self.assertNotIn("set-cookie", result["safe_headers"])
 
-            # Verify connection was made with injected header
             mock_conn.request.assert_called_once()
             _, kwargs = mock_conn.request.call_args
             req_headers = kwargs["headers"]
