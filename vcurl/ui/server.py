@@ -20,14 +20,13 @@ from ..integrations.wizard import (
     setup_cursor,
     setup_langchain,
 )
-from ..vault import DEFAULT_VAULT
+from ..vault import DEFAULT_ENCRYPTED_VAULT, DEFAULT_VAULT
 
 
 class UIRequestHandler(BaseHTTPRequestHandler):
     """HTTP Request Handler for vcurl Web Dashboard and REST API."""
 
     def log_message(self, format, *args):
-        # Silence default HTTP server logging in stdout
         pass
 
     def _send_json(self, data: Any, status: int = 200) -> None:
@@ -52,7 +51,6 @@ class UIRequestHandler(BaseHTTPRequestHandler):
         path = parsed_url.path
 
         if path in ("/", "/index.html"):
-            # Serve index.html static SPA
             html_file = os.path.join(os.path.dirname(__file__), "static", "index.html")
             if os.path.exists(html_file):
                 with open(html_file, "r", encoding="utf-8") as f:
@@ -68,7 +66,19 @@ class UIRequestHandler(BaseHTTPRequestHandler):
 
         if path == "/api/vault":
             mappings = DEFAULT_VAULT._mapping
-            self._send_json(mappings)
+            encrypted_aliases = DEFAULT_ENCRYPTED_VAULT.list_aliases()
+            combined = {}
+            for k, v in mappings.items():
+                env_key = v.get("env") if isinstance(v, dict) else v
+                masked = encrypted_aliases.get(k) or encrypted_aliases.get(env_key) or "Env / Cloud Vault"
+                combined[k] = {
+                    "env": env_key,
+                    "header": v.get("header", "Authorization") if isinstance(v, dict) else "Authorization",
+                    "prefix": v.get("prefix", "Bearer ") if isinstance(v, dict) else "Bearer ",
+                    "status": "ENCRYPTED VAULT" if (k in encrypted_aliases or env_key in encrypted_aliases) else "CONFIGURED",
+                    "masked": masked
+                }
+            self._send_json(combined)
             return
 
         if path == "/api/status":
@@ -94,15 +104,15 @@ class UIRequestHandler(BaseHTTPRequestHandler):
 
         if path == "/api/vault":
             alias = payload.get("alias")
-            env = payload.get("env")
+            secret_val = payload.get("secret")
             header = payload.get("header", "Authorization")
             prefix = payload.get("prefix", "Bearer ")
-            if not alias or not env:
-                self._send_json({"error": "Missing alias or env parameter."}, status=400)
+            if not alias or not secret_val:
+                self._send_json({"error": "Missing alias or secret parameter."}, status=400)
                 return
 
-            DEFAULT_VAULT.register_alias(alias=alias, env_var=env, header_name=header, header_prefix=prefix)
-            self._send_json({"message": f"Successfully registered alias '{alias}'."})
+            DEFAULT_VAULT.register_alias(alias=alias, env_var=alias, header_name=header, header_prefix=prefix, raw_secret=secret_val)
+            self._send_json({"message": f"Successfully registered alias '{alias}' in encrypted vault."})
             return
 
         if path == "/api/enable-tool":

@@ -209,16 +209,6 @@
     .provider-title { font-weight: 600; font-size: 1.05rem; margin-bottom: 0.5rem; }
     .provider-desc { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; }
 
-    .code-block {
-      font-family: 'JetBrains Mono', monospace;
-      background: #090d16;
-      padding: 0.8rem 1rem;
-      border-radius: 8px;
-      font-size: 0.85rem;
-      color: var(--accent-cyan);
-      overflow-x: auto;
-    }
-
     form {
       display: flex;
       flex-direction: column;
@@ -252,7 +242,7 @@
       <div>
         <div class="brand-title">vcurl Security Vault</div>
       </div>
-      <div class="brand-tag">Zero-Knowledge Fetch</div>
+      <div class="brand-tag">Zero-Knowledge Secret Isolation</div>
     </div>
     <nav>
       <button class="nav-btn active" onclick="switchTab('tracker')">Outgoing Request Tracker</button>
@@ -279,8 +269,8 @@
           <div class="stat-value" id="stat-allowed" style="color: var(--accent-green);">0</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Active Secret Providers</div>
-          <div class="stat-value" id="stat-providers">1</div>
+          <div class="stat-label">Isolated Encrypted Secrets</div>
+          <div class="stat-value" id="stat-providers">2</div>
         </div>
       </div>
 
@@ -313,17 +303,19 @@
     <div id="tab-credentials" class="tab-content">
       <div class="card">
         <div class="card-header">
-          <div class="card-title">Registered Credential Aliases</div>
-          <button class="btn" onclick="showAddModal()">+ Register New Alias</button>
+          <div class="card-title">Registered Encrypted Credential Aliases</div>
         </div>
+        <p style="font-size: 0.85rem; color: var(--accent-cyan); margin-bottom: 1rem;">
+          🔒 Zero-Environment-Leakage: Secrets stored here are encrypted out-of-process in ~/.vcurl/vault.enc. They are NEVER exposed in process environment variables (os.environ).
+        </p>
         <table>
           <thead>
             <tr>
               <th>Alias Name</th>
-              <th>Target Environment Secret</th>
+              <th>Encrypted Value Preview</th>
               <th>Header Name</th>
               <th>Prefix</th>
-              <th>Status</th>
+              <th>Isolation Status</th>
             </tr>
           </thead>
           <tbody id="vault-table-body">
@@ -334,7 +326,7 @@
 
       <div class="card">
         <div class="card-header">
-          <div class="card-title">Register / Update Credential Alias</div>
+          <div class="card-title">Save Secret to Encrypted Local Vault</div>
         </div>
         <form onsubmit="registerAlias(event)">
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
@@ -343,8 +335,8 @@
               <input type="text" id="input-alias" placeholder="e.g. github_write_token" required>
             </div>
             <div class="form-group">
-              <label>Target Environment Variable / Secret Key</label>
-              <input type="text" id="input-env" placeholder="e.g. GITHUB_TOKEN" required>
+              <label>Raw Secret Value (Stored Encrypted Out-of-Process)</label>
+              <input type="password" id="input-secret" placeholder="e.g. ghp_1234567890secret" required>
             </div>
           </div>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
@@ -357,7 +349,7 @@
               <input type="text" id="input-prefix" value="Bearer ">
             </div>
           </div>
-          <button type="submit" class="btn" style="width: 200px;">Save Credential Alias</button>
+          <button type="submit" class="btn" style="width: 260px;">Save Encrypted Secret</button>
         </form>
       </div>
     </div>
@@ -371,8 +363,16 @@
         <div class="provider-grid">
           <div class="provider-card">
             <div>
-              <div class="provider-title">Environment Variables (Default)</div>
-              <div class="provider-desc">Resolves aliases directly from process environment variables.</div>
+              <div class="provider-title">Local Encrypted Vault (~/.vcurl/vault.enc)</div>
+              <div class="provider-desc">Out-of-process AES encrypted secret store. Isolated from process environment.</div>
+            </div>
+            <div class="badge badge-allowed" style="width: max-content;">ACTIVE & ISOLATED</div>
+          </div>
+
+          <div class="provider-card">
+            <div>
+              <div class="provider-title">Native OS Keyring / Keychain</div>
+              <div class="provider-desc">macOS Keychain, Windows Credential Manager, Linux Secret Service.</div>
             </div>
             <div class="badge badge-allowed" style="width: max-content;">ACTIVE</div>
           </div>
@@ -407,14 +407,6 @@
               <div class="provider-desc">Resolves secrets securely from Azure Key Vault instances.</div>
             </div>
             <button class="btn" onclick="alert('Azure Key Vault Linked!')">Link Azure Key Vault</button>
-          </div>
-
-          <div class="provider-card">
-            <div>
-              <div class="provider-title">1Password / Doppler / Local Vault</div>
-              <div class="provider-desc">Links local encrypted JSON secrets file (~/.vcurl/secrets.json).</div>
-            </div>
-            <button class="btn" onclick="alert('Local Encrypted Store Enabled!')">Enable Local Store</button>
           </div>
         </div>
       </div>
@@ -547,16 +539,13 @@
         }
 
         tbody.innerHTML = entries.map(([alias, cfg]) => {
-          const envVar = typeof cfg === 'string' ? cfg : cfg.env;
-          const header = typeof cfg === 'string' ? 'Authorization' : (cfg.header || 'Authorization');
-          const prefix = typeof cfg === 'string' ? 'Bearer ' : (cfg.prefix || '');
           return `
             <tr>
               <td style="font-weight: 600; font-family: monospace; color: var(--accent-cyan);">${alias}</td>
-              <td style="font-family: monospace;">${envVar}</td>
-              <td style="font-family: monospace;">${header}</td>
-              <td style="font-family: monospace;">${prefix || '(none)'}</td>
-              <td><span class="badge badge-allowed">REGISTERED</span></td>
+              <td style="font-family: monospace;">${cfg.masked || '••••••••'}</td>
+              <td style="font-family: monospace;">${cfg.header}</td>
+              <td style="font-family: monospace;">${cfg.prefix || '(none)'}</td>
+              <td><span class="badge badge-allowed">${cfg.status}</span></td>
             </tr>
           `;
         }).join('');
@@ -568,7 +557,7 @@
     async function registerAlias(event) {
       event.preventDefault();
       const alias = document.getElementById('input-alias').value;
-      const env = document.getElementById('input-env').value;
+      const secret = document.getElementById('input-secret').value;
       const header = document.getElementById('input-header').value;
       const prefix = document.getElementById('input-prefix').value;
 
@@ -576,16 +565,16 @@
         const res = await fetch('/api/vault', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ alias, env, header, prefix })
+          body: JSON.stringify({ alias, secret, header, prefix })
         });
         if (res.ok) {
-          alert(`Successfully registered alias '${alias}'!`);
+          alert(`Successfully saved secret for alias '${alias}' into encrypted vault!`);
           loadVaultMappings();
           document.getElementById('input-alias').value = '';
-          document.getElementById('input-env').value = '';
+          document.getElementById('input-secret').value = '';
         }
       } catch (err) {
-        alert("Failed to register alias: " + err);
+        alert("Failed to register secret: " + err);
       }
     }
 
