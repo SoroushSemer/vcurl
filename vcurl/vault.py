@@ -1,7 +1,7 @@
 """
 vcurl Vault Module
-Provides credential alias configuration, pluggable secret provider resolution
-(Env, AWS, Vault, GCP, Azure, Encrypted Store), and secure header injection.
+Provides credential alias configuration, secret isolation via Encrypted Vault and OS Keyring,
+pluggable cloud providers (AWS, Vault, GCP, Azure), and secure header injection.
 """
 
 import os
@@ -9,6 +9,7 @@ from typing import Dict, List, Optional, Tuple, Union
 
 from .providers.base import BaseSecretProvider
 from .providers.cloud_providers import EncryptedFileProvider
+from .providers.encrypted_vault import EncryptedVaultProvider, KeyringProvider
 from .providers.env_provider import EnvSecretProvider
 
 
@@ -17,10 +18,16 @@ class VaultError(PermissionError):
     pass
 
 
+DEFAULT_ENCRYPTED_VAULT = EncryptedVaultProvider()
+
+
 class VaultConfig:
     """
     Manages mappings between safe credential aliases (used by LLMs)
-    and actual environment variables or external secret management providers.
+    and actual secrets stored in isolated Encrypted Vaults or OS Keyring.
+    
+    Prevents storing secrets in process environment variables (os.environ)
+    where LLMs or prompt injections could exfiltrate them via shell printenv.
     """
     def __init__(
         self,
@@ -31,46 +38,63 @@ class VaultConfig:
         if mapping:
             self._mapping.update(mapping)
 
+        # Default provider order prioritizes isolated encrypted vaults & keyring OVER environment variables
         self.providers: List[BaseSecretProvider] = providers if providers is not None else [
-            EnvSecretProvider(),
+            KeyringProvider(),
+            DEFAULT_ENCRYPTED_VAULT,
             EncryptedFileProvider(),
+            EnvSecretProvider(),
         ]
 
     def add_provider(self, provider: BaseSecretProvider) -> None:
         """Registers an external secret provider (e.g. AWS, HashiCorp Vault, GCP, Azure)."""
-        self.providers.insert(0, provider)  # Higher priority
+        self.providers.insert(0, provider)  # Top priority
 
     def register_alias(
         self,
         alias: str,
-        env_var: str,
+        env_var: Optional[str] = None,
         header_name: str = "Authorization",
-        header_prefix: str = "Bearer "
+        header_prefix: str = "Bearer ",
+        raw_secret: Optional[str] = None,
     ) -> None:
-        """Registers a credential alias mapping."""
+        """
+        Registers a credential alias mapping.
+        
+        If raw_secret is provided, it is stored safely in the local encrypted vault
+        without ever polluting os.environ!
+        """
+        target_key = env_var or alias
         self._mapping[alias] = {
-            "env": env_var,
+            "env": target_key,
             "header": header_name,
             "prefix": header_prefix
         }
 
-    def get_mapping(self, alias: str) -> Union[str, Dict[str, str]]:
-        """Retrieves raw configuration mapping for an alias."""
+        if raw_secret:
+            # Store directly in encrypted local vault
+            DEFAULT_ENCRYPTED_VAULT.set_secret(alias, raw_secret)
+            DEFAULT_ENCRYPTED_VAULT.set_secret(target_key, raw_secret)
+
+    def set_secret(self, alias: str, secret_val: str) -> None:
+        """Saves a secret value directly into the encrypted local vault."""
+        DEFAULT_ENCRYPTED_VAULT.set_secret(alias, secret_val)
         if alias not in self._mapping:
-            raise VaultError(
-                f"Unauthorized credential alias '{alias}'. Alias is not registered in vcurl vault."
-            )
+            self.register_alias(alias, alias)
+
+    def get_mapping(self, alias: str) -> Union[str, Dict[str, str]]:
+        """Retrieves configuration mapping for an alias."""
+        if alias not in self._mapping:
+            # Auto-register default fallback mapping for alias
+            return {"env": alias, "header": "Authorization", "prefix": "Bearer "}
         return self._mapping[alias]
 
     def resolve(self, alias: str) -> Tuple[str, str]:
         """
-        Resolves an alias to a header name and secret header value by querying configured providers.
+        Resolves an alias to a header name and secret value from active isolated providers.
         
         Returns:
             Tuple[header_name, header_value]
-        
-        Raises:
-            VaultError: If alias is not registered or secret cannot be resolved from any provider.
         """
         config = self.get_mapping(alias)
 
@@ -79,26 +103,34 @@ class VaultConfig:
             header_name = "Authorization"
             header_prefix = "Bearer "
         elif isinstance(config, dict):
-            env_var = config.get("env", "")
+            env_var = config.get("env", alias)
             header_name = config.get("header", "Authorization")
             header_prefix = config.get("prefix", "Bearer " if header_name.lower() == "authorization" else "")
         else:
-            raise VaultError(f"Invalid vault configuration for alias '{alias}'.")
+            env_var = alias
+            header_name = "Authorization"
+            header_prefix = "Bearer "
 
-        if not env_var:
-            raise VaultError(f"Configuration for alias '{alias}' is missing target secret key name.")
-
-        # Query chained secret providers in order
+        # Query chained secret providers (Keyring, EncryptedVault, Cloud Providers, Env)
         secret: Optional[str] = None
+        # Check alias name directly first
         for provider in self.providers:
-            val = provider.get_secret(env_var)
+            val = provider.get_secret(alias)
             if val:
                 secret = val
                 break
 
+        # Check env_var mapping if alias check did not return secret
+        if not secret:
+            for provider in self.providers:
+                val = provider.get_secret(env_var)
+                if val:
+                    secret = val
+                    break
+
         if not secret:
             raise VaultError(
-                f"Secret resolution failed: Secret key '{env_var}' for alias '{alias}' was not found in any active provider (Env, AWS, Vault, GCP, Azure, Encrypted Store)."
+                f"Secret resolution failed: Secret key '{alias}' (or '{env_var}') was not found in any isolated provider (Encrypted Vault, OS Keyring, AWS, HashiCorp Vault, GCP, Azure)."
             )
 
         header_value = f"{header_prefix}{secret}" if header_prefix else secret
