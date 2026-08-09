@@ -108,7 +108,7 @@ class TestVaultConfig(unittest.TestCase):
         """Ensure invalid alias raises VaultError."""
         with self.assertRaises(VaultError) as ctx:
             self.vault.resolve("non_existent_alias")
-        self.assertIn("Unauthorized credential alias", str(ctx.exception))
+        self.assertIn("was not found in any isolated provider", str(ctx.exception))
 
     def test_missing_environment_variable_throws_error(self):
         """Ensure missing environment variable raises VaultError."""
@@ -118,19 +118,18 @@ class TestVaultConfig(unittest.TestCase):
 
         with self.assertRaises(VaultError) as ctx:
             self.vault.resolve("test_alias")
-        self.assertIn("was not found in any active provider", str(ctx.exception))
+        self.assertIn("was not found in any isolated provider", str(ctx.exception))
 
     def test_valid_alias_resolution(self):
         """Ensure valid alias resolves to header name and bearer token value."""
-        self.vault.register_alias("github_write", "TEST_GITHUB_SECRET")
-        os.environ["TEST_GITHUB_SECRET"] = "ghp_secret_token_12345"
+        self.vault.set_secret("github_write", "ghp_secret_token_12345")
 
         try:
             hdr_name, hdr_val = self.vault.resolve("github_write")
             self.assertEqual(hdr_name, "Authorization")
             self.assertEqual(hdr_val, "Bearer ghp_secret_token_12345")
         finally:
-            del os.environ["TEST_GITHUB_SECRET"]
+            pass
 
 
 class TestSanitizer(unittest.TestCase):
@@ -184,7 +183,7 @@ class TestExecutionLayer(unittest.TestCase):
         mock_conn.getresponse.return_value = mock_response
         mock_pinned_https.return_value = mock_conn
 
-        os.environ["GITHUB_TOKEN"] = "ghp_mock_token_999"
+        DEFAULT_VAULT.set_secret("github_write_token", "ghp_mock_token_999")
 
         try:
             result = execute_vcurl(
@@ -205,8 +204,7 @@ class TestExecutionLayer(unittest.TestCase):
             self.assertEqual(kwargs["method"], "POST")
 
         finally:
-            if "GITHUB_TOKEN" in os.environ:
-                del os.environ["GITHUB_TOKEN"]
+            pass
 
 
 if __name__ == "__main__":

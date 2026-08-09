@@ -18,20 +18,23 @@ from .providers import (
     AzureKeyVaultProvider,
     BaseSecretProvider,
     EncryptedFileProvider,
+    EncryptedVaultProvider,
     EnvSecretProvider,
     GCPSecretProvider,
     HashiCorpVaultProvider,
+    KeyringProvider,
 )
 from .sanitizer import sanitize_headers, sanitize_response
 from .ssrf import SSRFError, is_ip_allowed, validate_url
 from .ui import start_ui_server
-from .vault import DEFAULT_VAULT, VaultConfig, VaultError
+from .vault import DEFAULT_ENCRYPTED_VAULT, DEFAULT_VAULT, VaultConfig, VaultError
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 __all__ = [
     "execute_vcurl",
     "VaultConfig",
     "DEFAULT_VAULT",
+    "DEFAULT_ENCRYPTED_VAULT",
     "SSRFError",
     "VaultError",
     "is_ip_allowed",
@@ -42,6 +45,8 @@ __all__ = [
     "AuditRecord",
     "AuditTracker",
     "BaseSecretProvider",
+    "EncryptedVaultProvider",
+    "KeyringProvider",
     "EnvSecretProvider",
     "AWSSecretProvider",
     "HashiCorpVaultProvider",
