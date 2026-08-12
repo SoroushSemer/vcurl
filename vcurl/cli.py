@@ -33,6 +33,12 @@ def main() -> None:
                     pass
             start_ui_server(port=port)
             return
+        elif cmd in ("eval", "evals"):
+            from .evals import LLMEvalRunner, print_eval_report
+            runner = LLMEvalRunner()
+            report = runner.run_evals()
+            print_eval_report(report)
+            return
         elif cmd == "vault":
             if len(sys.argv) > 2:
                 subcmd = sys.argv[2].lower()
