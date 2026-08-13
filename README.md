@@ -9,9 +9,13 @@
 
 ## 🎬 Product Demo & Architecture Video
 
-https://github.com/user-attachments/assets/vcurl_marketing_42s.mp4
+![vcurl Product Demo & Architecture](vcurl-promo/vcurl_demo.gif)
 
-> **42-Second Social Edition**: Demonstrates Prompt Injection Defense, Zero Environment Leakage, Just-In-Time Network Secret Injection, and the Web Management UI.
+<details>
+  <summary><b>▶️ Play Full HD 1080p Video with Audio</b></summary>
+  <br/>
+  <video src="vcurl-promo/vcurl_marketing_42s.mp4" controls width="100%"></video>
+</details>
 
 ---
 
