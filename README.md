@@ -38,7 +38,7 @@ Traditional tools rely on environment variables (`export GITHUB_TOKEN=...` or `o
 | **Secret Exposure Rate** | **0ms (100% Zero-Knowledge)** | Secrets stored out-of-process in OS Keyring / Vault. `os.environ` has **0 secrets**. |
 | **AI Secret Exfiltration Surge** | **81% Increase YoY** | *GitGuardian Report*: Commits co-authored by AI tools leak secrets at **2x baseline rate** (1.27M+ AI secrets exposed). |
 | **OWASP Risk Coverage** | **Rank #1 & #2 Covered** | Direct defense against **OWASP LLM01 (Prompt Injection)** & **OWASP LLM02 (Sensitive Info Disclosure)**. |
-| **Network Socket Latency** | **< 2.4ms Overhead** | Sub-millisecond DNS pinning & out-of-band header injection with minimal overhead. |
+| **Network Socket Latency** | **&lt; 2.4ms Overhead** | Sub-millisecond DNS pinning & out-of-band header injection with minimal overhead. |
 | **SSRF & DNS Rebinding** | **100% Block Rate** | Socket pinning blocks private subnets (`127.0.0.1`, `10.0.0.0/8`) & AWS metadata (`169.254.169.254`). |
 | **Enterprise Vault Connectors** | **6 Cloud & OS Vaults** | Connects **AWS Secrets Manager**, **HashiCorp Vault**, **GCP**, **Azure Key Vault**, **1Password**, & **OS Keyring**. |
 
